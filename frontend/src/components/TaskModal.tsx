@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X } from 'lucide-react'
+import { X, CheckCircle2, Clock, ListTodo, AlertCircle, Minus, ChevronUp, User } from 'lucide-react'
 import type { Task, TaskPriority, TaskStatus } from '../types'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -15,6 +15,18 @@ interface TaskModalProps {
     assignee_id: string
   }) => Promise<void>
 }
+
+const STATUS_OPTIONS: { value: TaskStatus; label: string; icon: React.ReactNode; classes: string }[] = [
+  { value: 'todo', label: 'To Do', icon: <ListTodo className="w-3.5 h-3.5" />, classes: 'bg-slate-100 text-slate-700 ring-slate-300' },
+  { value: 'in_progress', label: 'In Progress', icon: <Clock className="w-3.5 h-3.5" />, classes: 'bg-blue-100 text-blue-700 ring-blue-400' },
+  { value: 'done', label: 'Done', icon: <CheckCircle2 className="w-3.5 h-3.5" />, classes: 'bg-emerald-100 text-emerald-700 ring-emerald-400' },
+]
+
+const PRIORITY_OPTIONS: { value: TaskPriority; label: string; icon: React.ReactNode; dot: string }[] = [
+  { value: 'low', label: 'Low', icon: <Minus className="w-3.5 h-3.5" />, dot: 'bg-emerald-500' },
+  { value: 'medium', label: 'Medium', icon: <ChevronUp className="w-3.5 h-3.5" />, dot: 'bg-amber-500' },
+  { value: 'high', label: 'High', icon: <AlertCircle className="w-3.5 h-3.5" />, dot: 'bg-rose-500' },
+]
 
 export function TaskModal({ task, onClose, onSubmit }: TaskModalProps) {
   const { user } = useAuth()
@@ -63,129 +75,169 @@ export function TaskModal({ task, onClose, onSubmit }: TaskModalProps) {
 
   return (
     <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
-        <div className="flex items-center justify-between p-5 border-b">
-          <h2 className="text-lg font-semibold">{task ? 'Edit Task' : 'New Task'}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <X className="w-5 h-5" />
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-slide-up border border-slate-200">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100">
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">
+              {task ? 'Edit Task' : 'Create Task'}
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              {task ? 'Update the task details below' : 'Fill in the details for your new task'}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-all"
+          >
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-5">
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-2">
+            <div className="bg-rose-50 border border-rose-200 text-rose-700 text-sm rounded-xl px-4 py-3 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
               {error}
             </div>
           )}
 
+          {/* Title */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Title <span className="text-red-500">*</span>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              Title <span className="text-rose-500">*</span>
             </label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Task title"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="What needs to be done?"
+              className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
               autoFocus
             />
           </div>
 
+          {/* Description */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              Description
+              <span className="text-slate-400 font-normal ml-1.5">optional</span>
+            </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Optional description"
+              placeholder="Add more context or details…"
               rows={3}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          {/* Status & Priority */}
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value as TaskStatus)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="todo">To Do</option>
-                <option value="in_progress">In Progress</option>
-                <option value="done">Done</option>
-              </select>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Status</label>
+              <div className="flex flex-col gap-1.5">
+                {STATUS_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setStatus(opt.value)}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all border-2 ${
+                      status === opt.value
+                        ? `${opt.classes} ring-2 border-transparent`
+                        : 'border-slate-200 text-slate-500 hover:border-slate-300 bg-white'
+                    }`}
+                  >
+                    {opt.icon}
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
-              <select
-                value={priority}
-                onChange={(e) => setPriority(e.target.value as TaskPriority)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-              </select>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Priority</label>
+              <div className="flex flex-col gap-1.5">
+                {PRIORITY_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setPriority(opt.value)}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all border-2 ${
+                      priority === opt.value
+                        ? 'border-transparent bg-slate-100 text-slate-800 ring-2 ring-slate-300'
+                        : 'border-slate-200 text-slate-500 hover:border-slate-300 bg-white'
+                    }`}
+                  >
+                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${opt.dot}`} />
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Assignee
-            </label>
-            <div className="flex gap-2">
+          {/* Due Date & Assignee */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Due Date</label>
               <input
-                type="text"
-                value={assigneeId}
-                onChange={(e) => setAssigneeId(e.target.value)}
-                placeholder="User UUID (optional)"
-                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
               />
-              {user && (
-                <button
-                  type="button"
-                  onClick={() => setAssigneeId(assigneeId === user.id ? '' : user.id)}
-                  className={`px-3 py-2 text-xs rounded-lg border transition-colors whitespace-nowrap ${
-                    assigneeId === user.id
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'border-gray-300 text-gray-600 hover:border-blue-400'
-                  }`}
-                >
-                  {assigneeId === user.id ? 'Assigned to me' : 'Assign to me'}
-                </button>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Assignee</label>
+              <div className="flex gap-1.5">
+                <input
+                  type="text"
+                  value={assigneeId}
+                  onChange={(e) => setAssigneeId(e.target.value)}
+                  placeholder="User UUID"
+                  className="flex-1 min-w-0 border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                />
+                {user && (
+                  <button
+                    type="button"
+                    onClick={() => setAssigneeId(assigneeId === user.id ? '' : user.id)}
+                    title={assigneeId === user.id ? 'Unassign me' : 'Assign to me'}
+                    className={`flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-xl border-2 transition-all ${
+                      assigneeId === user.id
+                        ? 'bg-blue-600 border-blue-600 text-white'
+                        : 'border-slate-300 text-slate-500 hover:border-blue-400 hover:text-blue-500'
+                    }`}
+                  >
+                    <User className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+              {assigneeId === user?.id && (
+                <p className="text-xs text-blue-600 mt-1 font-medium">Assigned to you</p>
               )}
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
-            <input
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div className="flex gap-3 pt-2">
+          {/* Actions */}
+          <div className="flex gap-3 pt-1">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              className="flex-1 px-4 py-2.5 text-sm font-medium border border-slate-300 text-slate-700 rounded-xl hover:bg-slate-50 transition-all"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="flex-1 px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              className="flex-1 px-4 py-2.5 text-sm font-semibold bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl disabled:opacity-50 transition-all shadow-sm shadow-blue-200"
             >
-              {submitting ? 'Saving...' : task ? 'Save Changes' : 'Create Task'}
+              {submitting ? 'Saving…' : task ? 'Save Changes' : 'Create Task'}
             </button>
           </div>
         </form>
