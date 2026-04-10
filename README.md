@@ -178,3 +178,5 @@ Returns: { "total", "todo", "in_progress", "done", "high_priority", "medium_prio
 6. **Real-time updates via WebSocket/SSE.** If multiple users share a project, they'd see stale data. SSE would let the server push task updates to all connected clients.
 
 7. **Rate limiting.** The auth endpoints have no rate limiting; a real deployment would need this to prevent brute-force attacks.
+
+8. **Stricter email validation.** Registration currently checks for `@` and `.` only. A production app should validate against RFC 5322 or send a confirmation email to verify ownership.
