@@ -139,9 +139,16 @@ DELETE /projects/:id          Delete a project (cascades to tasks)
 
 ```
 GET    /projects/:id/tasks    List tasks  ?status=todo|in_progress|done  ?assignee=<uuid>
-POST   /projects/:id/tasks    Create task { "title", "description?", "status?", "priority?", "due_date?" }
+POST   /projects/:id/tasks    Create task { "title", "description?", "status?", "priority?", "assignee_id?", "due_date?" }
 PATCH  /tasks/:id             Update task (any subset of task fields)
 DELETE /tasks/:id             Delete a task
+```
+
+### Stats (Bonus)
+
+```
+GET    /projects/:id/stats    Task counts by status and priority
+Returns: { "total", "todo", "in_progress", "done", "high_priority", "medium_priority", "low_priority" }
 ```
 
 ### HTTP Status Codes

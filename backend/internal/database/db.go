@@ -24,21 +24,23 @@ func Connect() (*sql.DB, error) {
 		getEnv("DB_SSLMODE", "disable"),
 	)
 
-	var db *sql.DB
-	var err error
+	// Open once — sql.Open only validates the driver name, does not connect.
+	db, err := sql.Open("postgres", dsn)
+	if err != nil {
+		return nil, fmt.Errorf("opening database: %w", err)
+	}
 
+	// Retry the actual connection with back-off.
 	for i := 1; i <= 10; i++ {
-		db, err = sql.Open("postgres", dsn)
-		if err == nil {
-			if err = db.Ping(); err == nil {
-				break
-			}
+		if err = db.Ping(); err == nil {
+			break
+		}
+		if i == 10 {
+			db.Close()
+			return nil, fmt.Errorf("database not ready after %d attempts: %w", i, err)
 		}
 		slog.Info("waiting for database", "attempt", i, "error", err)
 		time.Sleep(time.Duration(i) * time.Second)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("connecting to database after retries: %w", err)
 	}
 
 	db.SetMaxOpenConns(25)

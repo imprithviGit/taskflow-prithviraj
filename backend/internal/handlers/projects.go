@@ -16,15 +16,19 @@ import (
 
 type ProjectHandler struct {
 	projects *models.ProjectStore
+	tasks    *models.TaskStore
 }
 
 func NewProjectHandler(db *sql.DB) *ProjectHandler {
-	return &ProjectHandler{projects: models.NewProjectStore(db)}
+	return &ProjectHandler{
+		projects: models.NewProjectStore(db),
+		tasks:    models.NewTaskStore(db),
+	}
 }
 
 func (h *ProjectHandler) List(w http.ResponseWriter, r *http.Request) {
 	userID := mw.GetUserID(r.Context())
-	projects, err := h.projects.ListByOwner(userID)
+	projects, err := h.projects.ListByOwner(r.Context(), userID)
 	if err != nil {
 		slog.Error("listing projects", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal server error")
@@ -52,7 +56,7 @@ func (h *ProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	project, err := h.projects.Create(req.Name, req.Description, userID)
+	project, err := h.projects.Create(r.Context(), req.Name, req.Description, userID)
 	if err != nil {
 		slog.Error("creating project", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal server error")
@@ -95,7 +99,7 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 		desc = req.Description
 	}
 
-	updated, err := h.projects.Update(project.ID, name, desc)
+	updated, err := h.projects.Update(r.Context(), project.ID, name, desc)
 	if err != nil {
 		slog.Error("updating project", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal server error")
@@ -111,12 +115,28 @@ func (h *ProjectHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.projects.Delete(project.ID); err != nil {
+	if err := h.projects.Delete(r.Context(), project.ID); err != nil {
 		slog.Error("deleting project", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *ProjectHandler) Stats(w http.ResponseWriter, r *http.Request) {
+	userID := mw.GetUserID(r.Context())
+	project, ok := h.getOwnedProject(w, r, userID)
+	if !ok {
+		return
+	}
+
+	stats, err := h.tasks.GetStats(r.Context(), project.ID)
+	if err != nil {
+		slog.Error("getting project stats", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	writeJSON(w, http.StatusOK, stats)
 }
 
 func (h *ProjectHandler) getOwnedProject(w http.ResponseWriter, r *http.Request, userID uuid.UUID) (*models.Project, bool) {
@@ -126,20 +146,19 @@ func (h *ProjectHandler) getOwnedProject(w http.ResponseWriter, r *http.Request,
 		return nil, false
 	}
 
-	project, err := h.projects.FindByID(id)
+	project, err := h.projects.FindByID(r.Context(), id)
 	if err != nil {
 		slog.Error("finding project", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal server error")
 		return nil, false
 	}
 	if project == nil {
-		writeError(w, http.StatusNotFound, "project not found")
+		writeError(w, http.StatusNotFound, "not found")
 		return nil, false
 	}
 	if project.OwnerID != userID {
-		writeError(w, http.StatusForbidden, "access denied")
+		writeError(w, http.StatusForbidden, "forbidden")
 		return nil, false
 	}
 	return project, true
 }
-

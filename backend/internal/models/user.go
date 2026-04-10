@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"time"
@@ -25,7 +26,7 @@ func NewUserStore(db *sql.DB) *UserStore {
 	return &UserStore{db: db}
 }
 
-func (s *UserStore) Create(name, email, password string) (*User, error) {
+func (s *UserStore) Create(ctx context.Context, name, email, password string) (*User, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), 12)
 	if err != nil {
 		return nil, fmt.Errorf("hashing password: %w", err)
@@ -39,7 +40,7 @@ func (s *UserStore) Create(name, email, password string) (*User, error) {
 		CreatedAt: time.Now().UTC(),
 	}
 
-	_, err = s.db.Exec(
+	_, err = s.db.ExecContext(ctx,
 		`INSERT INTO users (id, name, email, password, created_at) VALUES ($1, $2, $3, $4, $5)`,
 		user.ID, user.Name, user.Email, user.Password, user.CreatedAt,
 	)
@@ -49,9 +50,9 @@ func (s *UserStore) Create(name, email, password string) (*User, error) {
 	return user, nil
 }
 
-func (s *UserStore) FindByEmail(email string) (*User, error) {
+func (s *UserStore) FindByEmail(ctx context.Context, email string) (*User, error) {
 	user := &User{}
-	err := s.db.QueryRow(
+	err := s.db.QueryRowContext(ctx,
 		`SELECT id, name, email, password, created_at FROM users WHERE email = $1`,
 		email,
 	).Scan(&user.ID, &user.Name, &user.Email, &user.Password, &user.CreatedAt)
@@ -64,9 +65,9 @@ func (s *UserStore) FindByEmail(email string) (*User, error) {
 	return user, nil
 }
 
-func (s *UserStore) FindByID(id uuid.UUID) (*User, error) {
+func (s *UserStore) FindByID(ctx context.Context, id uuid.UUID) (*User, error) {
 	user := &User{}
-	err := s.db.QueryRow(
+	err := s.db.QueryRowContext(ctx,
 		`SELECT id, name, email, created_at FROM users WHERE id = $1`,
 		id,
 	).Scan(&user.ID, &user.Name, &user.Email, &user.CreatedAt)

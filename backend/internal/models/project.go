@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"time"
@@ -24,7 +25,7 @@ func NewProjectStore(db *sql.DB) *ProjectStore {
 	return &ProjectStore{db: db}
 }
 
-func (s *ProjectStore) Create(name string, description *string, ownerID uuid.UUID) (*Project, error) {
+func (s *ProjectStore) Create(ctx context.Context, name string, description *string, ownerID uuid.UUID) (*Project, error) {
 	p := &Project{
 		ID:          uuid.New(),
 		Name:        name,
@@ -32,7 +33,7 @@ func (s *ProjectStore) Create(name string, description *string, ownerID uuid.UUI
 		OwnerID:     ownerID,
 		CreatedAt:   time.Now().UTC(),
 	}
-	_, err := s.db.Exec(
+	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO projects (id, name, description, owner_id, created_at) VALUES ($1, $2, $3, $4, $5)`,
 		p.ID, p.Name, p.Description, p.OwnerID, p.CreatedAt,
 	)
@@ -42,8 +43,8 @@ func (s *ProjectStore) Create(name string, description *string, ownerID uuid.UUI
 	return p, nil
 }
 
-func (s *ProjectStore) ListByOwner(ownerID uuid.UUID) ([]*Project, error) {
-	rows, err := s.db.Query(
+func (s *ProjectStore) ListByOwner(ctx context.Context, ownerID uuid.UUID) ([]*Project, error) {
+	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, name, description, owner_id, created_at FROM projects WHERE owner_id = $1 ORDER BY created_at DESC`,
 		ownerID,
 	)
@@ -60,12 +61,15 @@ func (s *ProjectStore) ListByOwner(ownerID uuid.UUID) ([]*Project, error) {
 		}
 		projects = append(projects, p)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating projects: %w", err)
+	}
 	return projects, nil
 }
 
-func (s *ProjectStore) FindByID(id uuid.UUID) (*Project, error) {
+func (s *ProjectStore) FindByID(ctx context.Context, id uuid.UUID) (*Project, error) {
 	p := &Project{}
-	err := s.db.QueryRow(
+	err := s.db.QueryRowContext(ctx,
 		`SELECT id, name, description, owner_id, created_at FROM projects WHERE id = $1`,
 		id,
 	).Scan(&p.ID, &p.Name, &p.Description, &p.OwnerID, &p.CreatedAt)
@@ -78,9 +82,9 @@ func (s *ProjectStore) FindByID(id uuid.UUID) (*Project, error) {
 	return p, nil
 }
 
-func (s *ProjectStore) Update(id uuid.UUID, name string, description *string) (*Project, error) {
+func (s *ProjectStore) Update(ctx context.Context, id uuid.UUID, name string, description *string) (*Project, error) {
 	p := &Project{}
-	err := s.db.QueryRow(
+	err := s.db.QueryRowContext(ctx,
 		`UPDATE projects SET name = $1, description = $2 WHERE id = $3
 		 RETURNING id, name, description, owner_id, created_at`,
 		name, description, id,
@@ -94,12 +98,15 @@ func (s *ProjectStore) Update(id uuid.UUID, name string, description *string) (*
 	return p, nil
 }
 
-func (s *ProjectStore) Delete(id uuid.UUID) error {
-	result, err := s.db.Exec(`DELETE FROM projects WHERE id = $1`, id)
+func (s *ProjectStore) Delete(ctx context.Context, id uuid.UUID) error {
+	result, err := s.db.ExecContext(ctx, `DELETE FROM projects WHERE id = $1`, id)
 	if err != nil {
 		return fmt.Errorf("deleting project: %w", err)
 	}
-	n, _ := result.RowsAffected()
+	n, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking rows affected: %w", err)
+	}
 	if n == 0 {
 		return sql.ErrNoRows
 	}

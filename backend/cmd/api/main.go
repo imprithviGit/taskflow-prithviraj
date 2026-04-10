@@ -76,6 +76,7 @@ func main() {
 		r.Get("/projects/{id}", projectHandler.Get)
 		r.Patch("/projects/{id}", projectHandler.Update)
 		r.Delete("/projects/{id}", projectHandler.Delete)
+		r.Get("/projects/{id}/stats", projectHandler.Stats)
 
 		r.Get("/projects/{id}/tasks", taskHandler.ListByProject)
 		r.Post("/projects/{id}/tasks", taskHandler.Create)
@@ -120,14 +121,15 @@ func main() {
 }
 
 func runSeed(db *sql.DB) {
+	ctx := context.Background()
 	userStore := models.NewUserStore(db)
 
-	existing, err := userStore.FindByEmail("demo@taskflow.com")
+	existing, err := userStore.FindByEmail(ctx, "demo@taskflow.com")
 	if err != nil || existing != nil {
 		return
 	}
 
-	user, err := userStore.Create("Demo User", "demo@taskflow.com", "password123")
+	user, err := userStore.Create(ctx, "Demo User", "demo@taskflow.com", "password123")
 	if err != nil {
 		slog.Warn("seed: create user failed", "error", err)
 		return
@@ -135,7 +137,7 @@ func runSeed(db *sql.DB) {
 
 	projectStore := models.NewProjectStore(db)
 	desc := "A sample project to get you started"
-	project, err := projectStore.Create("Demo Project", &desc, user.ID)
+	project, err := projectStore.Create(ctx, "Demo Project", &desc, user.ID)
 	if err != nil {
 		slog.Warn("seed: create project failed", "error", err)
 		return
@@ -152,14 +154,13 @@ func runSeed(db *sql.DB) {
 
 	for _, s := range seeds {
 		d := s.desc
-		_, err := taskStore.Create(&models.Task{
+		if _, err := taskStore.Create(ctx, &models.Task{
 			Title:       s.title,
 			Description: &d,
 			Status:      models.TaskStatus(s.status),
 			Priority:    models.TaskPriority(s.priority),
 			ProjectID:   project.ID,
-		})
-		if err != nil {
+		}); err != nil {
 			slog.Warn("seed: create task failed", "error", err)
 		}
 	}

@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"time"
@@ -43,6 +44,16 @@ type TaskUpdate struct {
 	DueDate     *time.Time
 }
 
+type ProjectStats struct {
+	Total          int `json:"total"`
+	Todo           int `json:"todo"`
+	InProgress     int `json:"in_progress"`
+	Done           int `json:"done"`
+	HighPriority   int `json:"high_priority"`
+	MediumPriority int `json:"medium_priority"`
+	LowPriority    int `json:"low_priority"`
+}
+
 type TaskStore struct {
 	db *sql.DB
 }
@@ -51,12 +62,12 @@ func NewTaskStore(db *sql.DB) *TaskStore {
 	return &TaskStore{db: db}
 }
 
-func (s *TaskStore) Create(t *Task) (*Task, error) {
+func (s *TaskStore) Create(ctx context.Context, t *Task) (*Task, error) {
 	t.ID = uuid.New()
 	t.CreatedAt = time.Now().UTC()
 	t.UpdatedAt = time.Now().UTC()
 
-	_, err := s.db.Exec(`
+	_, err := s.db.ExecContext(ctx, `
 		INSERT INTO tasks (id, title, description, status, priority, project_id, assignee_id, due_date, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
 		t.ID, t.Title, t.Description, t.Status, t.Priority,
@@ -68,7 +79,7 @@ func (s *TaskStore) Create(t *Task) (*Task, error) {
 	return t, nil
 }
 
-func (s *TaskStore) ListByProject(projectID uuid.UUID, status, assigneeID string) ([]*Task, error) {
+func (s *TaskStore) ListByProject(ctx context.Context, projectID uuid.UUID, status, assigneeID string) ([]*Task, error) {
 	query := `SELECT id, title, description, status, priority, project_id, assignee_id, due_date, created_at, updated_at
 	          FROM tasks WHERE project_id = $1`
 	args := []interface{}{projectID}
@@ -85,7 +96,7 @@ func (s *TaskStore) ListByProject(projectID uuid.UUID, status, assigneeID string
 	}
 	query += " ORDER BY created_at DESC"
 
-	rows, err := s.db.Query(query, args...)
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("querying tasks: %w", err)
 	}
@@ -100,12 +111,15 @@ func (s *TaskStore) ListByProject(projectID uuid.UUID, status, assigneeID string
 		}
 		tasks = append(tasks, t)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating tasks: %w", err)
+	}
 	return tasks, nil
 }
 
-func (s *TaskStore) FindByID(id uuid.UUID) (*Task, error) {
+func (s *TaskStore) FindByID(ctx context.Context, id uuid.UUID) (*Task, error) {
 	t := &Task{}
-	err := s.db.QueryRow(`
+	err := s.db.QueryRowContext(ctx, `
 		SELECT id, title, description, status, priority, project_id, assignee_id, due_date, created_at, updated_at
 		FROM tasks WHERE id = $1`, id,
 	).Scan(&t.ID, &t.Title, &t.Description, &t.Status, &t.Priority,
@@ -119,8 +133,9 @@ func (s *TaskStore) FindByID(id uuid.UUID) (*Task, error) {
 	return t, nil
 }
 
-// Update applies only the non-nil fields in u. Column names are hardcoded (not user input).
-func (s *TaskStore) Update(id uuid.UUID, u *TaskUpdate) (*Task, error) {
+// Update applies only the non-nil fields in u.
+// Column names are hardcoded (not user-supplied), so the dynamic query is SQL-injection safe.
+func (s *TaskStore) Update(ctx context.Context, id uuid.UUID, u *TaskUpdate) (*Task, error) {
 	type col struct {
 		name string
 		val  interface{}
@@ -147,7 +162,7 @@ func (s *TaskStore) Update(id uuid.UUID, u *TaskUpdate) (*Task, error) {
 	}
 
 	if len(cols) == 0 {
-		return s.FindByID(id)
+		return s.FindByID(ctx, id)
 	}
 
 	set := ""
@@ -169,7 +184,7 @@ func (s *TaskStore) Update(id uuid.UUID, u *TaskUpdate) (*Task, error) {
 		set, len(args))
 
 	t := &Task{}
-	err := s.db.QueryRow(query, args...).Scan(
+	err := s.db.QueryRowContext(ctx, query, args...).Scan(
 		&t.ID, &t.Title, &t.Description, &t.Status, &t.Priority,
 		&t.ProjectID, &t.AssigneeID, &t.DueDate, &t.CreatedAt, &t.UpdatedAt,
 	)
@@ -182,14 +197,39 @@ func (s *TaskStore) Update(id uuid.UUID, u *TaskUpdate) (*Task, error) {
 	return t, nil
 }
 
-func (s *TaskStore) Delete(id uuid.UUID) error {
-	result, err := s.db.Exec(`DELETE FROM tasks WHERE id = $1`, id)
+func (s *TaskStore) Delete(ctx context.Context, id uuid.UUID) error {
+	result, err := s.db.ExecContext(ctx, `DELETE FROM tasks WHERE id = $1`, id)
 	if err != nil {
 		return fmt.Errorf("deleting task: %w", err)
 	}
-	n, _ := result.RowsAffected()
+	n, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking rows affected: %w", err)
+	}
 	if n == 0 {
 		return sql.ErrNoRows
 	}
 	return nil
+}
+
+func (s *TaskStore) GetStats(ctx context.Context, projectID uuid.UUID) (*ProjectStats, error) {
+	stats := &ProjectStats{}
+	err := s.db.QueryRowContext(ctx, `
+		SELECT
+			COUNT(*),
+			COUNT(*) FILTER (WHERE status = 'todo'),
+			COUNT(*) FILTER (WHERE status = 'in_progress'),
+			COUNT(*) FILTER (WHERE status = 'done'),
+			COUNT(*) FILTER (WHERE priority = 'high'),
+			COUNT(*) FILTER (WHERE priority = 'medium'),
+			COUNT(*) FILTER (WHERE priority = 'low')
+		FROM tasks WHERE project_id = $1`, projectID,
+	).Scan(
+		&stats.Total, &stats.Todo, &stats.InProgress, &stats.Done,
+		&stats.HighPriority, &stats.MediumPriority, &stats.LowPriority,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("getting project stats: %w", err)
+	}
+	return stats, nil
 }

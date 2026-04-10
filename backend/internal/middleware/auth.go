@@ -24,7 +24,7 @@ func JWTAuth(jwtService *auth.JWTService) func(http.Handler) http.Handler {
 			if header == "" || !strings.HasPrefix(header, "Bearer ") {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusUnauthorized)
-				w.Write([]byte(`{"error":"missing or invalid authorization header"}`))
+				w.Write([]byte(`{"error":"unauthorized"}`))
 				return
 			}
 
@@ -32,7 +32,7 @@ func JWTAuth(jwtService *auth.JWTService) func(http.Handler) http.Handler {
 			if err != nil {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusUnauthorized)
-				w.Write([]byte(`{"error":"invalid or expired token"}`))
+				w.Write([]byte(`{"error":"unauthorized"}`))
 				return
 			}
 

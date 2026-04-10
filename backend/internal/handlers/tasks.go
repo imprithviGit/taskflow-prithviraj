@@ -37,7 +37,7 @@ func (h *TaskHandler) ListByProject(w http.ResponseWriter, r *http.Request) {
 	status := r.URL.Query().Get("status")
 	assignee := r.URL.Query().Get("assignee")
 
-	tasks, err := h.tasks.ListByProject(project.ID, status, assignee)
+	tasks, err := h.tasks.ListByProject(r.Context(), project.ID, status, assignee)
 	if err != nil {
 		slog.Error("listing tasks", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal server error")
@@ -113,7 +113,7 @@ func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 		task.DueDate = &t
 	}
 
-	created, err := h.tasks.Create(task)
+	created, err := h.tasks.Create(r.Context(), task)
 	if err != nil {
 		slog.Error("creating task", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal server error")
@@ -130,20 +130,26 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	task, err := h.tasks.FindByID(taskID)
+	task, err := h.tasks.FindByID(r.Context(), taskID)
 	if err != nil {
 		slog.Error("finding task", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
 	if task == nil {
-		writeError(w, http.StatusNotFound, "task not found")
+		writeError(w, http.StatusNotFound, "not found")
 		return
 	}
 
-	project, err := h.projects.FindByID(task.ProjectID)
-	if err != nil || project == nil || project.OwnerID != userID {
-		writeError(w, http.StatusForbidden, "access denied")
+	// Verify the caller owns the project this task belongs to.
+	project, err := h.projects.FindByID(r.Context(), task.ProjectID)
+	if err != nil {
+		slog.Error("finding project for task", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	if project == nil || project.OwnerID != userID {
+		writeError(w, http.StatusForbidden, "forbidden")
 		return
 	}
 
@@ -201,7 +207,7 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 		update.DueDate = &t
 	}
 
-	updated, err := h.tasks.Update(taskID, update)
+	updated, err := h.tasks.Update(r.Context(), taskID, update)
 	if err != nil {
 		slog.Error("updating task", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal server error")
@@ -218,24 +224,29 @@ func (h *TaskHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	task, err := h.tasks.FindByID(taskID)
+	task, err := h.tasks.FindByID(r.Context(), taskID)
 	if err != nil {
 		slog.Error("finding task", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
 	if task == nil {
-		writeError(w, http.StatusNotFound, "task not found")
+		writeError(w, http.StatusNotFound, "not found")
 		return
 	}
 
-	project, err := h.projects.FindByID(task.ProjectID)
-	if err != nil || project == nil || project.OwnerID != userID {
-		writeError(w, http.StatusForbidden, "access denied")
+	project, err := h.projects.FindByID(r.Context(), task.ProjectID)
+	if err != nil {
+		slog.Error("finding project for task", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	if project == nil || project.OwnerID != userID {
+		writeError(w, http.StatusForbidden, "forbidden")
 		return
 	}
 
-	if err := h.tasks.Delete(taskID); err != nil {
+	if err := h.tasks.Delete(r.Context(), taskID); err != nil {
 		slog.Error("deleting task", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal server error")
 		return
@@ -249,18 +260,18 @@ func (h *TaskHandler) requireOwnedProject(w http.ResponseWriter, r *http.Request
 		writeError(w, http.StatusBadRequest, "invalid project id")
 		return nil, false
 	}
-	project, err := h.projects.FindByID(id)
+	project, err := h.projects.FindByID(r.Context(), id)
 	if err != nil {
 		slog.Error("finding project", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal server error")
 		return nil, false
 	}
 	if project == nil {
-		writeError(w, http.StatusNotFound, "project not found")
+		writeError(w, http.StatusNotFound, "not found")
 		return nil, false
 	}
 	if project.OwnerID != userID {
-		writeError(w, http.StatusForbidden, "access denied")
+		writeError(w, http.StatusForbidden, "forbidden")
 		return nil, false
 	}
 	return project, true

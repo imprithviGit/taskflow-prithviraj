@@ -49,7 +49,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	existing, err := h.users.FindByEmail(req.Email)
+	existing, err := h.users.FindByEmail(r.Context(), req.Email)
 	if err != nil {
 		slog.Error("checking existing user", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal server error")
@@ -60,7 +60,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.users.Create(req.Name, req.Email, req.Password)
+	user, err := h.users.Create(r.Context(), req.Name, req.Email, req.Password)
 	if err != nil {
 		slog.Error("creating user", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal server error")
@@ -99,14 +99,14 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.users.FindByEmail(req.Email)
+	user, err := h.users.FindByEmail(r.Context(), req.Email)
 	if err != nil {
 		slog.Error("finding user", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
 	if user == nil || !user.CheckPassword(req.Password) {
-		writeError(w, http.StatusUnauthorized, "invalid credentials")
+		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
 

@@ -21,7 +21,7 @@ export function Navbar() {
 
         {user && (
           <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-600 hidden sm:block">{user.email}</span>
+            <span className="text-sm text-gray-600 hidden sm:block">{user.name}</span>
             <button
               onClick={handleLogout}
               className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-red-600 transition-colors"

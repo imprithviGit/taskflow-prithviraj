@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
 import type { Task, TaskPriority, TaskStatus } from '../types'
+import { useAuth } from '../contexts/AuthContext'
 
 interface TaskModalProps {
   task?: Task | null
@@ -11,17 +12,18 @@ interface TaskModalProps {
     status: TaskStatus
     priority: TaskPriority
     due_date: string
+    assignee_id: string
   }) => Promise<void>
 }
 
 export function TaskModal({ task, onClose, onSubmit }: TaskModalProps) {
+  const { user } = useAuth()
   const [title, setTitle] = useState(task?.title ?? '')
   const [description, setDescription] = useState(task?.description ?? '')
   const [status, setStatus] = useState<TaskStatus>(task?.status ?? 'todo')
   const [priority, setPriority] = useState<TaskPriority>(task?.priority ?? 'medium')
-  const [dueDate, setDueDate] = useState(
-    task?.due_date ? task.due_date.split('T')[0] : '',
-  )
+  const [dueDate, setDueDate] = useState(task?.due_date ? task.due_date.split('T')[0] : '')
+  const [assigneeId, setAssigneeId] = useState(task?.assignee_id ?? '')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
@@ -40,7 +42,14 @@ export function TaskModal({ task, onClose, onSubmit }: TaskModalProps) {
     setSubmitting(true)
     setError('')
     try {
-      await onSubmit({ title: title.trim(), description, status, priority, due_date: dueDate })
+      await onSubmit({
+        title: title.trim(),
+        description,
+        status,
+        priority,
+        due_date: dueDate,
+        assignee_id: assigneeId,
+      })
       onClose()
     } catch (err: unknown) {
       const msg =
@@ -122,6 +131,34 @@ export function TaskModal({ task, onClose, onSubmit }: TaskModalProps) {
                 <option value="medium">Medium</option>
                 <option value="high">High</option>
               </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Assignee
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={assigneeId}
+                onChange={(e) => setAssigneeId(e.target.value)}
+                placeholder="User UUID (optional)"
+                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              {user && (
+                <button
+                  type="button"
+                  onClick={() => setAssigneeId(assigneeId === user.id ? '' : user.id)}
+                  className={`px-3 py-2 text-xs rounded-lg border transition-colors whitespace-nowrap ${
+                    assigneeId === user.id
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'border-gray-300 text-gray-600 hover:border-blue-400'
+                  }`}
+                >
+                  {assigneeId === user.id ? 'Assigned to me' : 'Assign to me'}
+                </button>
+              )}
             </div>
           </div>
 

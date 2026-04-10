@@ -68,15 +68,27 @@ export const createTask = (
 
 export const updateTask = (
   taskId: string,
-  data: Partial<{
-    title: string
-    description: string
-    status: TaskStatus
-    priority: TaskPriority
-    assignee_id: string
-    due_date: string
-  }>,
+  data: {
+    title?: string
+    description?: string
+    status?: TaskStatus
+    priority?: TaskPriority
+    assignee_id?: string
+    due_date?: string
+  },
 ) => api.patch<Task>(`/tasks/${taskId}`, data).then((r) => r.data)
 
 export const deleteTask = (taskId: string) =>
   api.delete(`/tasks/${taskId}`)
+
+// Stats
+export const getProjectStats = (projectId: string) =>
+  api.get<{
+    total: number
+    todo: number
+    in_progress: number
+    done: number
+    high_priority: number
+    medium_priority: number
+    low_priority: number
+  }>(`/projects/${projectId}/stats`).then((r) => r.data)
