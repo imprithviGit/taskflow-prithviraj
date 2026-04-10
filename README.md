@@ -19,7 +19,7 @@ A minimal task management system with authentication, projects, and tasks.
 
 ```bash
 # 1. Clone and enter the repo
-git clone <your-repo-url> taskflow-prithviraj
+git clone https://github.com/imprithviGit/taskflow-prithviraj.git taskflow-prithviraj
 cd taskflow-prithviraj
 
 # 2. Copy env file (defaults work out of the box)
