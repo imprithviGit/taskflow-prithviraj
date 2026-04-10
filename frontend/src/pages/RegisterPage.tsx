@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { CheckSquare } from 'lucide-react'
+import { Zap } from 'lucide-react'
 import { register } from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -18,11 +18,9 @@ export function RegisterPage() {
     const errs: Record<string, string> = {}
     if (!name.trim()) errs.name = 'Name is required'
     if (!email.includes('@')) errs.email = 'Valid email is required'
-    if (password.length < 8) errs.password = 'Password must be at least 8 characters'
-    if (Object.keys(errs).length > 0) {
-      setErrors(errs)
-      return
-    }
+    if (password.length < 8) errs.password = 'Minimum 8 characters'
+    if (Object.keys(errs).length > 0) return setErrors(errs)
+
     setErrors({})
     setLoading(true)
     try {
@@ -41,77 +39,71 @@ export function RegisterPage() {
     }
   }
 
+  const field = (
+    label: string,
+    key: string,
+    type: string,
+    value: string,
+    onChange: (v: string) => void,
+    placeholder: string,
+    autoComplete?: string,
+  ) => (
+    <div>
+      <label className="block text-sm font-medium text-slate-700 mb-1.5">{label}</label>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        autoComplete={autoComplete}
+        className={`w-full border rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
+          errors[key] ? 'border-rose-400 bg-rose-50' : 'border-slate-300'
+        }`}
+      />
+      {errors[key] && <p className="text-rose-500 text-xs mt-1.5 font-medium">{errors[key]}</p>}
+    </div>
+  )
+
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
-      <div className="w-full max-w-sm">
-        <div className="flex flex-col items-center mb-8">
-          <div className="flex items-center gap-2 text-blue-600 mb-2">
-            <CheckSquare className="w-8 h-8" />
-            <span className="text-2xl font-bold">TaskFlow</span>
+    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-slate-50">
+      <div className="w-full max-w-sm animate-slide-up">
+        <div className="flex items-center gap-2 justify-center mb-8">
+          <div className="w-9 h-9 bg-gradient-to-br from-blue-600 to-violet-600 rounded-xl flex items-center justify-center">
+            <Zap className="w-5 h-5 text-white" />
           </div>
-          <p className="text-gray-500 text-sm">Create your account</p>
+          <span className="font-bold text-slate-900 text-xl">TaskFlow</span>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="mb-8 text-center">
+          <h2 className="text-2xl font-bold text-slate-900">Create your account</h2>
+          <p className="text-slate-500 mt-1 text-sm">Get started for free, no credit card required</p>
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
           {errors._general && (
-            <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-2 mb-4">
+            <div className="bg-rose-50 border border-rose-200 text-rose-700 text-sm rounded-xl px-4 py-3 mb-5">
               {errors._general}
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Jane Smith"
-                className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.name ? 'border-red-400' : 'border-gray-300'}`}
-                autoComplete="name"
-              />
-              {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.email ? 'border-red-400' : 'border-gray-300'}`}
-                autoComplete="email"
-              />
-              {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Min. 8 characters"
-                className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.password ? 'border-red-400' : 'border-gray-300'}`}
-                autoComplete="new-password"
-              />
-              {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
-            </div>
+            {field('Full name', 'name', 'text', name, setName, 'Jane Smith', 'name')}
+            {field('Email address', 'email', 'email', email, setEmail, 'you@example.com', 'email')}
+            {field('Password', 'password', 'password', password, setPassword, 'Min. 8 characters', 'new-password')}
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-2.5 rounded-xl text-sm font-semibold disabled:opacity-50 transition-all shadow-sm shadow-blue-200 mt-2"
             >
-              {loading ? 'Creating account...' : 'Create Account'}
+              {loading ? 'Creating account…' : 'Create account'}
             </button>
           </form>
         </div>
 
-        <p className="text-center text-sm text-gray-500 mt-4">
+        <p className="text-center text-sm text-slate-500 mt-5">
           Already have an account?{' '}
-          <Link to="/login" className="text-blue-600 hover:underline font-medium">
+          <Link to="/login" className="text-blue-600 hover:text-blue-700 font-semibold">
             Sign in
           </Link>
         </p>
